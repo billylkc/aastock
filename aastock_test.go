@@ -1,6 +1,7 @@
 package aastock
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -21,6 +22,48 @@ func Test_getLastValue(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := getLastValue(tt.args.values); got != tt.want {
 				t.Errorf("getLastValue() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetList(t *testing.T) {
+	tests := []struct {
+		name string
+		want []string
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := GetList(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GetList() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetCurrentPrice(t *testing.T) {
+	type args struct {
+		c int
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    StockPrice
+		wantErr bool
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := GetCurrentPrice(tt.args.c)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetCurrentPrice() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GetCurrentPrice() = %v, want %v", got, tt.want)
 			}
 		})
 	}
