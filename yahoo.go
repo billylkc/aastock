@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -82,8 +84,45 @@ type YHStockPrice struct {
 	} `json:"chart"`
 }
 
-// GetCurrentPrice gets the current price of the stock from Yahoo finance
-func GetCurrentPrice(c int) (Stock, error) {
+// GetCurrentPrices gets the current prices of a provided list of stocks
+func GetCurrentPrices(data ...int) []Stock {
+	numWorkers := 5
+
+	done := make(chan bool)
+	defer close(done)
+
+	// Send data
+	in := send(data...)
+
+	// Start workers to process the data
+	workers := make([]<-chan Stock, numWorkers)
+	for i := 0; i < len(workers); i++ {
+		workers[i] = process(done, in)
+	}
+
+	// Merge all channels, and sork
+	var result []Stock
+	for n := range merge(done, workers...) {
+		if n.MarketPrice != 0 {
+			result = append(result, n)
+		}
+	}
+	sort.SliceStable(result, func(i, j int) bool {
+		return result[i].Code < result[j].Code
+	})
+
+	return result
+}
+
+// GetPrice is a wrapper of getCurrentPrices to be used in concurrent call
+// which would skip any error response
+func getPrice(c int) Stock {
+	result, _ := getCurrentPrices(c)
+	return result
+}
+
+// getCurrentPrices gets the current price of the stock from Yahoo finance
+func getCurrentPrices(c int) (Stock, error) {
 	var (
 		stock   Stock        // Market price struct
 		yhStock YHStockPrice // Original Yahoo Response
@@ -117,15 +156,78 @@ func GetCurrentPrice(c int) (Stock, error) {
 	}
 
 	// Return stock object if market price is greater than 0
-	price := yhStock.Chart.Result[0].Meta.RegularMarketPrice
-	rt := int64(yhStock.Chart.Result[0].Meta.RegularMarketTime)
-	tm := time.Unix(rt, 0)
-	loc, _ := time.LoadLocation("Local")
-	marketTime := tm.In(loc).Format("2006-01-02 15:04:05")
+	r := yhStock.Chart.Result
+	if len(r) != 0 {
+		price := r[0].Meta.RegularMarketPrice
+		rt := int64(r[0].Meta.RegularMarketTime)
+		tm := time.Unix(rt, 0)
+		loc, _ := time.LoadLocation("Local")
+		marketTime := tm.In(loc).Format("2006-01-02 15:04:05")
 
-	if price > 0 {
-		stock = Stock{Code: code, MarketTime: marketTime, MarketPrice: price}
+		if price > 0 {
+			stock = Stock{Code: code, MarketTime: marketTime, MarketPrice: price}
+		}
+
 	}
 
 	return stock, nil
+}
+
+func send(nums ...int) <-chan int {
+	out := make(chan int, len(nums))
+	go func() {
+		defer close(out)
+		for _, n := range nums {
+			out <- n
+		}
+	}()
+
+	return out
+}
+
+func process(done <-chan bool, in <-chan int) <-chan Stock {
+	out := make(chan Stock)
+	go func() {
+		defer close(out)
+
+		for n := range in {
+			select {
+			case out <- getPrice(n):
+			case <-done:
+				return
+			}
+		}
+
+	}()
+	return out
+}
+
+func merge(done <-chan bool, cs ...<-chan Stock) <-chan Stock {
+	var wg sync.WaitGroup
+	out := make(chan Stock)
+
+	// Start an output goroutine for each input channel in cs.  output
+	// copies values from c to out until c is closed, then calls wg.Done.
+	output := func(c <-chan Stock) {
+		for n := range c {
+			select {
+			case out <- n:
+			case <-done:
+			}
+		}
+		wg.Done()
+	}
+
+	wg.Add(len(cs))
+	for _, c := range cs {
+		go output(c)
+	}
+
+	// Start a goroutine to close out once all the output goroutines are
+	// done.  This must start after the wg.Add call.
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+	return out
 }
