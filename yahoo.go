@@ -100,8 +100,9 @@ func GetCurrentPrices(data ...int) []Stock {
 		workers[i] = process(done, in)
 	}
 
-	// Merge all channels, and sork
+	// Merge all channels, and sort
 	var result []Stock
+
 	for n := range merge(done, workers...) {
 		if n.MarketPrice != 0 {
 			result = append(result, n)
@@ -121,7 +122,8 @@ func getPrice(c int) Stock {
 	return result
 }
 
-// getCurrentPrices gets the current price of the stock from Yahoo finance
+// getCurrentPrices gets the delayed price of the stock from Yahoo finance (15mins delay)
+// Return only price within 30 mins
 func getCurrentPrices(c int) (Stock, error) {
 	var (
 		stock   Stock        // Market price struct
@@ -159,15 +161,22 @@ func getCurrentPrices(c int) (Stock, error) {
 	r := yhStock.Chart.Result
 	if len(r) != 0 {
 		price := r[0].Meta.RegularMarketPrice
-		rt := int64(r[0].Meta.RegularMarketTime)
+		rt := int64(r[0].Meta.RegularMarketTime) // Market time
+
+		// Compare market time and current time
+		tc := time.Now()
 		tm := time.Unix(rt, 0)
-		loc, _ := time.LoadLocation("Local")
-		marketTime := tm.In(loc).Format("2006-01-02 15:04:05")
+		diff := tc.Sub(tm)
+		threshold, _ := time.ParseDuration("30m")
 
-		if price > 0 {
-			stock = Stock{Code: code, MarketTime: marketTime, MarketPrice: price}
+		// Only return records within 30 mins of the call
+		if diff <= threshold {
+			if price > 0 {
+				loc, _ := time.LoadLocation("Local")
+				marketTime := tm.In(loc).Format("2006-01-02 15:04:05")
+				stock = Stock{Code: code, MarketTime: marketTime, MarketPrice: price}
+			}
 		}
-
 	}
 
 	return stock, nil
