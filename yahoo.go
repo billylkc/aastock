@@ -164,8 +164,8 @@ func getCurrentPrices(c int) (Stock, error) {
 		rt := int64(r[0].Meta.RegularMarketTime) // Market time
 
 		// Compare market time and current time
-		tc := time.Now()
-		tm := time.Unix(rt, 0)
+		tc := time.Now()       // Current time
+		tm := time.Unix(rt, 0) // Market time
 		diff := tc.Sub(tm)
 		threshold, _ := time.ParseDuration("30m")
 
