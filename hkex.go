@@ -10,14 +10,14 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-type company struct {
+type Company struct {
 	Code string
 	Name string
 }
 
 // GetCompanyName looks up company name from HKEX
-func GetCompanyName(c int) (company, error) {
-	var result company
+func GetCompanyName(c int) (Company, error) {
+	var result Company
 
 	// Handle input, e.g. code = 00005, date 2021-02-01
 	targetCode := fmt.Sprintf("%05d", c) // zfill to 5 digit
@@ -53,7 +53,7 @@ func GetCompanyName(c int) (company, error) {
 			companyStr := matched[i][2]
 
 			if codeStr == targetCode {
-				result = company{
+				result = Company{
 					Code: targetCode,
 					Name: companyStr,
 				}

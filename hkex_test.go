@@ -12,7 +12,7 @@ func TestGetCompanyName(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    company
+		want    Company
 		wantErr bool
 	}{
 		{
@@ -20,7 +20,7 @@ func TestGetCompanyName(t *testing.T) {
 			args: args{
 				c: 5, // 00005 as hsbc
 			},
-			want: company{
+			want: Company{
 				Code: "00005",
 				Name: "匯豐控股",
 			},
